@@ -41,13 +41,14 @@ Build the app first, then run this in PowerShell:
 .\set-md-default.ps1
 ```
 
-## 更新发布 / Release
+## 版本记录 / Changelog
 
-仓库只保存源码，不提交 `node_modules/` 或 `dist/`。  
-This repository stores source code only. Do not commit `node_modules/` or `dist/`.
+### v1.0.0
 
-发布新版时，创建新的 Git tag 或运行 GitHub Actions 构建，然后把生成包上传到 Releases。  
-For a new version, create a Git tag or run the GitHub Actions build, then upload the packaged build to Releases.
+- 首个公开版本 / Initial public release
+- 支持实时编辑预览、多标签页、搜索、主题和字体设置 / Live preview, tabs, search, themes, and font controls
+- 支持保存 Markdown，导出 HTML 和 PDF / Save Markdown, export HTML and PDF
+- 提供 Windows 打包版本 / Windows packaged build available
 
 ## License
 
