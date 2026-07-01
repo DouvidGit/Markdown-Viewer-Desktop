@@ -1,0 +1,39 @@
+{
+  "name": "markdown-viewer-desktop",
+  "version": "1.0.0",
+  "description": "A lightweight desktop Markdown editor and previewer.",
+  "main": "main.js",
+  "author": "DouvidGit",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "start": "electron .",
+    "start:file": "electron . sample.md",
+    "dist": "electron-builder --win --dir",
+    "portable": "electron-builder --win portable",
+    "pack": "electron-builder --win --dir"
+  },
+  "build": {
+    "appId": "local.markdown-viewer",
+    "productName": "Markdown Viewer",
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js",
+      "assets/**/*",
+      "package.json"
+    ],
+    "icon": "assets/logo.ico",
+    "win": {
+      "signAndEditExecutable": false,
+      "target": [
+        "dir"
+      ],
+      "artifactName": "${productName}-${version}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8"
+  }
+}

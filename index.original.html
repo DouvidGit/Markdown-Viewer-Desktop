@@ -1,0 +1,1906 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Markdown Viewer</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23f4efe7'/%3E%3Cpath d='M14 18h34a4 4 0 0 1 4 4v22a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V22a4 4 0 0 1 4-4Z' fill='%23ffffff' stroke='%238aa08b' stroke-width='3'/%3E%3Cpath d='M18 40V27h4l5 7 5-7h4v13h-5v-6l-4 5-4-5v6h-5Z' fill='%235f735f'/%3E%3Cpath d='M43 27v10l-4-4h8l-4 4' fill='none' stroke='%23b47b63' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f4ef;
+      --bar: #eee9e0;
+      --surface: #ffffff;
+      --surface-soft: #faf8f3;
+      --border: #ded8cc;
+      --border-strong: #bdb4a6;
+      --text: #2b2d2a;
+      --muted: #746f66;
+      --accent: #637d65;
+      --accent-soft: #edf3ea;
+      --danger: #a06452;
+      --mark: #f7e7a4;
+      --split: 50%;
+      --editor-size: 15px;
+      --preview-size: 16px;
+      --toolbar-height: auto;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --sans: Inter, "Segoe UI", "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+      --editor-font: var(--mono);
+      --content-font: var(--sans);
+    }
+
+    [data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #101311;
+      --bar: #171a18;
+      --surface: #1b1f1c;
+      --surface-soft: #202520;
+      --border: #30362f;
+      --border-strong: #4d574b;
+      --text: #e7e4db;
+      --muted: #b4ad9f;
+      --accent: #b7caa9;
+      --accent-soft: #364331;
+      --danger: #d49a80;
+      --mark: #7c7032;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--content-font);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      min-height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    select {
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 0 8px;
+    }
+
+    button:hover {
+      border-color: var(--border-strong);
+      background: var(--surface-soft);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.48;
+    }
+
+    button:focus-visible,
+    input:focus-visible,
+    textarea:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    .app {
+      height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      background: var(--bg);
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: grid;
+      grid-template-rows: auto auto auto auto;
+      border-bottom: 1px solid var(--border);
+      background: var(--bar);
+    }
+
+    .title-row,
+    .tabs-row,
+    .format-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .title-row {
+      display: grid;
+      grid-template-columns: auto auto minmax(0, 1fr);
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .tabs-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto auto;
+    }
+
+    .format-row {
+      border-bottom: 0;
+      flex-wrap: wrap;
+      overflow: hidden;
+    }
+
+    .fullscreen-row {
+      display: none;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      min-width: 0;
+      padding: 6px 10px;
+      border-bottom: 0;
+      background: var(--bar);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 185px;
+      font-weight: 700;
+      font-size: 17px;
+    }
+
+    .brand-mark {
+      width: 22px;
+      height: 22px;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--accent);
+      font-size: 13px;
+    }
+
+    .toolbar,
+    .stats,
+    .search,
+    .tab-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .toolbar {
+      flex: 1;
+      justify-content: flex-end;
+      flex-wrap: nowrap;
+      overflow: hidden;
+    }
+
+    .stats {
+      color: var(--muted);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    .btn,
+    .tool-btn,
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .btn {
+      padding: 0 10px;
+    }
+
+    .title-row .btn,
+    .title-row .icon-btn,
+    .title-row select,
+    .fullscreen-row .btn,
+    .fullscreen-row .icon-btn,
+    .fullscreen-row select {
+      flex: 0 0 auto;
+    }
+
+    .title-row .btn {
+      max-width: 96px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    #fullscreenBtn {
+      max-width: 112px;
+    }
+
+    #fontSelect,
+    #fsFontSelect {
+      width: 116px;
+    }
+
+    .tool-btn {
+      min-width: 32px;
+      padding: 0 8px;
+      font-weight: 650;
+    }
+
+    .icon-btn {
+      width: 32px;
+      padding: 0;
+    }
+
+    .primary {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .danger {
+      color: var(--danger);
+    }
+
+    .toggle.active,
+    .segmented button.active {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .segmented {
+      display: inline-grid;
+      grid-template-columns: repeat(3, minmax(48px, 1fr));
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+    }
+
+    .segmented button {
+      min-height: 30px;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 9px;
+    }
+
+    .tabs {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .tab {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex: 1 1 140px;
+      min-width: 72px;
+      max-width: 220px;
+      height: 32px;
+      padding: 0 8px 0 10px;
+      border: 1px solid var(--border);
+      border-bottom-color: var(--border);
+      border-radius: 4px 4px 0 0;
+      background: var(--surface-soft);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .tab.active {
+      color: var(--accent);
+      background: var(--surface);
+      border-bottom-color: var(--surface);
+    }
+
+    .tab-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .tab-close {
+      width: 20px;
+      min-height: 20px;
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      padding: 0;
+    }
+
+    .search input {
+      width: 190px;
+      height: 30px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text);
+      padding: 0 9px;
+    }
+
+    .search-count {
+      min-width: 42px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(260px, var(--split)) 8px minmax(260px, 1fr);
+      background: var(--surface);
+    }
+
+    .panel {
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      border-right: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    .preview-panel {
+      border-right: 0;
+      border-left: 1px solid var(--border);
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 34px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface-soft);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .editor-wrap,
+    .preview-wrap {
+      min-height: 0;
+      overflow: auto;
+      background: var(--surface);
+    }
+
+    .editor {
+      width: 100%;
+      min-height: 100%;
+      height: 100%;
+      resize: none;
+      border: 0;
+      background: var(--surface);
+      color: var(--text);
+      padding: 18px 20px 60px;
+      font-family: var(--editor-font);
+      font-size: var(--editor-size);
+      line-height: 1.65;
+      tab-size: 2;
+      overflow: auto;
+    }
+
+    .editor[readonly] {
+      background: var(--surface-soft);
+      cursor: default;
+    }
+
+    .preview {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 28px 42px 70px;
+      font-size: var(--preview-size);
+      font-family: var(--content-font);
+      line-height: 1.72;
+      overflow-wrap: anywhere;
+    }
+
+    .preview > *:first-child {
+      margin-top: 0;
+    }
+
+    .preview h1,
+    .preview h2,
+    .preview h3,
+    .preview h4 {
+      line-height: 1.3;
+      margin: 1.35em 0 0.55em;
+    }
+
+    .preview h1 {
+      padding-bottom: 0.28em;
+      border-bottom: 1px solid var(--border);
+      font-size: 2em;
+    }
+
+    .preview h2 {
+      padding-bottom: 0.2em;
+      border-bottom: 1px solid var(--border);
+      font-size: 1.55em;
+    }
+
+    .preview h3 {
+      font-size: 1.25em;
+    }
+
+    .preview p,
+    .preview ul,
+    .preview ol,
+    .preview blockquote,
+    .preview table,
+    .preview pre {
+      margin: 0.8em 0;
+    }
+
+    .preview a {
+      color: var(--accent);
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    .preview blockquote {
+      border-left: 4px solid var(--border);
+      color: var(--muted);
+      padding: 2px 0 2px 14px;
+    }
+
+    .preview code {
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--surface-soft);
+      padding: 0.12em 0.34em;
+      font-family: var(--mono);
+      font-size: 0.9em;
+    }
+
+    .preview pre {
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      background: var(--surface-soft);
+      padding: 14px;
+    }
+
+    .preview pre code {
+      border: 0;
+      background: transparent;
+      padding: 0;
+    }
+
+    .preview table {
+      width: 100%;
+      border-collapse: collapse;
+      display: block;
+      overflow-x: auto;
+    }
+
+    .preview th,
+    .preview td {
+      border: 1px solid var(--border);
+      padding: 8px 10px;
+      text-align: left;
+    }
+
+    .preview th {
+      background: var(--surface-soft);
+    }
+
+    .preview img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .preview hr {
+      border: 0;
+      border-top: 1px solid var(--border);
+      margin: 1.4em 0;
+    }
+
+    .preview input[type="checkbox"] {
+      margin-right: 0.45em;
+    }
+
+    .preview mark {
+      border-radius: 2px;
+      background: var(--mark);
+      color: inherit;
+      padding: 0 1px;
+    }
+
+    .empty-preview {
+      color: var(--muted);
+    }
+
+    .splitter {
+      min-width: 8px;
+      background: var(--bar);
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      cursor: col-resize;
+    }
+
+    .splitter:hover,
+    .splitter.dragging {
+      background: var(--accent-soft);
+    }
+
+    .statusbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 30px;
+      gap: 10px;
+      padding: 0 10px;
+      border-top: 1px solid var(--border);
+      background: var(--bar);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .toast {
+      position: fixed;
+      right: 14px;
+      bottom: 14px;
+      z-index: 40;
+      max-width: min(360px, calc(100vw - 28px));
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--surface);
+      color: var(--text);
+      opacity: 0;
+      transform: translateY(8px);
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    body.view-edit .workspace {
+      grid-template-columns: 1fr;
+    }
+
+    body.view-edit .preview-panel,
+    body.view-edit .splitter {
+      display: none;
+    }
+
+    body.view-preview .workspace {
+      grid-template-columns: 1fr;
+    }
+
+    body.view-preview .editor-panel,
+    body.view-preview .splitter {
+      display: none;
+    }
+
+    body.preview-fullscreen .app {
+      grid-template-rows: auto 1fr;
+    }
+
+    body.preview-fullscreen .title-row,
+    body.preview-fullscreen .tabs-row,
+    body.preview-fullscreen .format-row,
+    body.preview-fullscreen .editor-panel,
+    body.preview-fullscreen .splitter,
+    body.preview-fullscreen .statusbar {
+      display: none;
+    }
+
+    body.preview-fullscreen .fullscreen-row {
+      display: flex;
+    }
+
+    body.preview-fullscreen .workspace {
+      grid-template-columns: 1fr;
+      min-height: 0;
+    }
+
+    body.preview-fullscreen .preview-panel {
+      display: grid !important;
+      border-left: 0;
+    }
+
+    body.preview-fullscreen .panel-header {
+      display: none;
+    }
+
+    body.preview-fullscreen .preview {
+      max-width: 980px;
+      padding-top: 38px;
+    }
+
+    #fileInput {
+      display: none;
+    }
+
+    @media (max-width: 920px) {
+      body {
+        overflow: auto;
+      }
+
+      html,
+      body {
+        height: auto;
+        min-height: 100%;
+      }
+
+      .app {
+        min-height: 100vh;
+        height: auto;
+      }
+
+      .title-row,
+      .tabs-row {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .title-row,
+      .tabs-row {
+        display: flex;
+      }
+
+      .toolbar {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .search {
+        width: 100%;
+        flex-wrap: wrap;
+      }
+
+      .search input {
+        width: min(100%, 260px);
+      }
+
+      .workspace,
+      body.view-split .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .splitter {
+        display: none;
+      }
+
+      .panel {
+        min-height: 420px;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .preview-panel {
+        border-left: 0;
+      }
+
+      .preview {
+        padding: 24px 20px 54px;
+      }
+    }
+
+    @media (max-width: 620px) {
+      .format-row,
+      .toolbar {
+        gap: 5px;
+      }
+
+      .btn {
+        padding: 0 8px;
+      }
+
+      .brand {
+        min-width: 0;
+      }
+
+      .segmented {
+        width: 100%;
+      }
+    }
+
+    @media print {
+      :root,
+      [data-theme="dark"] {
+        color-scheme: light;
+        --surface: #ffffff;
+        --surface-soft: #f7f8fa;
+        --border: #d9dde4;
+        --text: #151922;
+        --muted: #4d5665;
+        --accent: #1f5fd1;
+      }
+
+      html,
+      body {
+        height: auto;
+        overflow: visible;
+        background: #ffffff !important;
+      }
+
+      .app {
+        display: block;
+        height: auto;
+      }
+
+      .topbar,
+      .statusbar,
+      .editor-panel,
+      .splitter,
+      .panel-header,
+      .toast {
+        display: none !important;
+      }
+
+      .workspace,
+      body.view-edit .workspace,
+      body.view-preview .workspace {
+        display: block;
+      }
+
+      .preview-panel {
+        display: block !important;
+        border: 0;
+      }
+
+      .preview-wrap {
+        overflow: visible;
+      }
+
+      .preview {
+        max-width: 760px;
+        margin: 0 auto;
+        padding: 0;
+        color: #151922;
+        font-size: 11.5pt;
+        line-height: 1.65;
+      }
+
+      .preview h1,
+      .preview h2,
+      .preview h3 {
+        page-break-after: avoid;
+      }
+
+      .preview table,
+      .preview pre,
+      .preview blockquote,
+      .preview img {
+        break-inside: avoid;
+      }
+
+      .preview mark {
+        background: transparent;
+      }
+    }
+  </style>
+</head>
+<body class="view-split">
+  <div class="app">
+    <header class="topbar">
+      <div class="title-row">
+        <div class="brand">
+          <span>Markdown Viewer</span>
+          <span class="brand-mark">M</span>
+        </div>
+        <div class="stats" aria-label="文档统计" data-i18n-aria="stats">
+          <span id="readTime">0 Min Read</span>
+          <span id="wordCount">0 Words</span>
+          <span id="charCount">0 Chars</span>
+          <span id="lineCount">0 Lines</span>
+        </div>
+        <div class="toolbar" aria-label="主工具栏" data-i18n-aria="mainToolbar">
+          <button class="btn" id="openBtn" type="button" data-i18n="open">打开</button>
+          <button class="btn primary" id="downloadBtn" type="button" data-i18n="saveMd">保存 .md</button>
+          <button class="btn" id="pdfBtn" type="button" data-i18n="exportPdf">导出 PDF</button>
+          <input id="fileInput" type="file" accept=".md,.markdown,text/markdown,text/plain">
+          <div class="segmented" role="group" aria-label="视图模式" data-i18n-aria="viewMode">
+            <button type="button" data-view="split" class="active" data-i18n="split">分屏</button>
+            <button type="button" data-view="edit" data-i18n="edit">编辑</button>
+            <button type="button" data-view="preview" data-i18n="preview">预览</button>
+          </div>
+          <button class="btn" id="fullscreenBtn" type="button" data-i18n="fullscreenPreview">全屏预览</button>
+          <button class="btn" id="languageBtn" type="button">EN</button>
+          <select id="fontSelect" aria-label="字体" data-i18n-aria="fontSelect">
+            <option value="system" data-i18n="fontSystem">系统默认</option>
+            <option value="cnReadable" data-i18n="fontCn">中文阅读</option>
+            <option value="serif" data-i18n="fontSerif">衬线阅读</option>
+            <option value="mono" data-i18n="fontMono">等宽专注</option>
+          </select>
+          <button class="icon-btn" id="decreaseFontBtn" type="button" title="缩小字号" aria-label="缩小字号" data-i18n-title="decreaseFont" data-i18n-aria="decreaseFont">A-</button>
+          <button class="icon-btn" id="increaseFontBtn" type="button" title="放大字号" aria-label="放大字号" data-i18n-title="increaseFont" data-i18n-aria="increaseFont">A+</button>
+          <button class="icon-btn" id="themeBtn" type="button" title="切换明暗主题" aria-label="切换明暗主题" data-i18n-title="theme" data-i18n-aria="theme">☾</button>
+        </div>
+      </div>
+
+      <div class="tabs-row">
+        <div class="tabs" id="tabs" aria-label="文档标签页" data-i18n-aria="tabs"></div>
+        <div class="tab-actions">
+          <button class="btn" id="newTabBtn" type="button" data-i18n="newTab">+ New Tab</button>
+        </div>
+        <div class="search" role="search">
+          <input id="searchInput" type="search" placeholder="搜索当前 Tab" data-i18n-placeholder="searchPlaceholder">
+          <button class="icon-btn" id="prevMatchBtn" type="button" title="上一个" aria-label="上一个" data-i18n-title="prevMatch" data-i18n-aria="prevMatch">↑</button>
+          <button class="icon-btn" id="nextMatchBtn" type="button" title="下一个" aria-label="下一个" data-i18n-title="nextMatch" data-i18n-aria="nextMatch">↓</button>
+          <span class="search-count" id="searchCount">0/0</span>
+        </div>
+      </div>
+
+      <div class="format-row" aria-label="Markdown 快捷工具" data-i18n-aria="formatToolbar">
+        <button class="btn" id="copyMdBtn" type="button" data-i18n="copyMd">复制 MD</button>
+        <button class="btn" id="copyHtmlBtn" type="button" data-i18n="copyHtml">复制 HTML</button>
+        <button class="btn danger" id="clearBtn" type="button" data-i18n="clear">清空</button>
+        <button class="btn toggle" id="syncScrollBtn" type="button" data-i18n="syncScroll">同步滚动</button>
+        <button class="btn toggle" id="editLockBtn" type="button" data-i18n="editLock">编辑锁</button>
+        <button class="tool-btn" type="button" data-format="h1" title="一级标题" data-i18n-title="h1">H1</button>
+        <button class="tool-btn" type="button" data-format="h2" title="二级标题" data-i18n-title="h2">H2</button>
+        <button class="tool-btn" type="button" data-format="h3" title="三级标题" data-i18n-title="h3">H3</button>
+        <button class="tool-btn" type="button" data-format="bold" title="加粗" data-i18n-title="bold">B</button>
+        <button class="tool-btn" type="button" data-format="italic" title="斜体" data-i18n-title="italic"><i>I</i></button>
+        <button class="tool-btn" type="button" data-format="quote" title="引用" data-i18n-title="quote">“</button>
+        <button class="tool-btn" type="button" data-format="ul" title="无序列表" data-i18n-title="ul">•</button>
+        <button class="tool-btn" type="button" data-format="ol" title="有序列表" data-i18n-title="ol">1.</button>
+        <button class="tool-btn" type="button" data-format="task" title="任务列表" data-i18n-title="task">☐</button>
+        <button class="tool-btn" type="button" data-format="link" title="链接" data-i18n-title="link">🔗</button>
+        <button class="tool-btn" type="button" data-format="image" title="图片" data-i18n-title="image">▧</button>
+        <button class="tool-btn" type="button" data-format="inlineCode" title="行内代码" data-i18n-title="inlineCode">&lt;/&gt;</button>
+        <button class="tool-btn" type="button" data-format="codeBlock" title="代码块" data-i18n-title="codeBlock">```</button>
+        <button class="tool-btn" type="button" data-format="table" title="表格" data-i18n-title="table">▦</button>
+        <button class="tool-btn" type="button" data-format="hr" title="分割线" data-i18n-title="hr">—</button>
+      </div>
+
+      <div class="fullscreen-row" aria-label="全屏预览工具栏" data-i18n-aria="fullscreenToolbar">
+        <button class="btn" id="fsLanguageBtn" type="button">EN</button>
+        <select id="fsFontSelect" aria-label="字体" data-i18n-aria="fontSelect">
+          <option value="system" data-i18n="fontSystem">系统默认</option>
+          <option value="cnReadable" data-i18n="fontCn">中文阅读</option>
+          <option value="serif" data-i18n="fontSerif">衬线阅读</option>
+          <option value="mono" data-i18n="fontMono">等宽专注</option>
+        </select>
+        <button class="icon-btn" id="fsDecreaseFontBtn" type="button" title="缩小字号" aria-label="缩小字号" data-i18n-title="decreaseFont" data-i18n-aria="decreaseFont">A-</button>
+        <button class="icon-btn" id="fsIncreaseFontBtn" type="button" title="放大字号" aria-label="放大字号" data-i18n-title="increaseFont" data-i18n-aria="increaseFont">A+</button>
+        <button class="icon-btn" id="fsThemeBtn" type="button" title="切换明暗主题" aria-label="切换明暗主题" data-i18n-title="theme" data-i18n-aria="theme">☾</button>
+        <button class="btn" id="exitFullscreenBtn" type="button" data-i18n="exitFullscreen">退出全屏</button>
+      </div>
+    </header>
+
+    <main class="workspace" id="workspace">
+      <section class="panel editor-panel" aria-label="Markdown 编辑器">
+        <div class="panel-header">
+          <span data-i18n="markdown">Markdown</span>
+          <span id="fileName">未命名文档</span>
+        </div>
+        <div class="editor-wrap">
+          <textarea class="editor" id="editor" spellcheck="false"></textarea>
+        </div>
+      </section>
+
+      <div class="splitter" id="splitter" role="separator" aria-orientation="vertical" aria-label="调整分屏比例"></div>
+
+      <section class="panel preview-panel" aria-label="预览">
+        <div class="panel-header">
+          <span data-i18n="previewPanel">预览</span>
+          <span id="previewTitle">当前文档</span>
+        </div>
+        <div class="preview-wrap" id="previewWrap">
+          <article class="preview" id="preview"></article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span id="activeTabInfo">1 个文档</span>
+      <span data-i18n="searchScope">当前搜索只作用于当前 Tab</span>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const sampleMarkdown = `# 日常 Markdown 示例
+
+这是一个轻量的 Markdown Viewer。左边编辑，右边实时预览。
+
+## 常用格式
+
+- **加粗**、*斜体*、~~删除线~~
+- [链接示例](https://example.com)
+- \`行内代码\`
+
+> 适合写笔记、整理说明、检查格式，然后导出 PDF。
+
+## 任务列表
+
+- [x] 写 Markdown
+- [x] 实时预览
+- [ ] 导出 PDF
+
+## 表格
+
+| 项目 | 状态 | 备注 |
+| --- | --- | --- |
+| 编辑 | 完成 | 支持实时输入 |
+| 预览 | 完成 | 支持常见语法 |
+| PDF | 可用 | 通过浏览器打印 |
+
+## 代码块
+
+\`\`\`js
+function hello(name) {
+  return \`Hello, \${name}!\`;
+}
+\`\`\`
+
+---
+
+可以新建多个 Tab，分别编辑不同文档。`;
+
+    const editor = document.getElementById("editor");
+    const preview = document.getElementById("preview");
+    const previewWrap = document.getElementById("previewWrap");
+    const workspace = document.getElementById("workspace");
+    const splitter = document.getElementById("splitter");
+    const tabsEl = document.getElementById("tabs");
+    const fileInput = document.getElementById("fileInput");
+    const fileNameEl = document.getElementById("fileName");
+    const previewTitle = document.getElementById("previewTitle");
+    const activeTabInfo = document.getElementById("activeTabInfo");
+    const readTime = document.getElementById("readTime");
+    const wordCount = document.getElementById("wordCount");
+    const charCount = document.getElementById("charCount");
+    const lineCount = document.getElementById("lineCount");
+    const searchInput = document.getElementById("searchInput");
+    const searchCount = document.getElementById("searchCount");
+    const themeBtn = document.getElementById("themeBtn");
+    const syncScrollBtn = document.getElementById("syncScrollBtn");
+    const editLockBtn = document.getElementById("editLockBtn");
+    const languageBtn = document.getElementById("languageBtn");
+    const fontSelect = document.getElementById("fontSelect");
+    const fullscreenBtn = document.getElementById("fullscreenBtn");
+    const fsLanguageBtn = document.getElementById("fsLanguageBtn");
+    const fsFontSelect = document.getElementById("fsFontSelect");
+    const fsDecreaseFontBtn = document.getElementById("fsDecreaseFontBtn");
+    const fsIncreaseFontBtn = document.getElementById("fsIncreaseFontBtn");
+    const fsThemeBtn = document.getElementById("fsThemeBtn");
+    const exitFullscreenBtn = document.getElementById("exitFullscreenBtn");
+    const toast = document.getElementById("toast");
+    const viewButtons = document.querySelectorAll("[data-view]");
+
+    const translations = {
+      zh: {
+        stats: "文档统计",
+        mainToolbar: "主工具栏",
+        viewMode: "视图模式",
+        tabs: "文档标签页",
+        fontSelect: "字体",
+        formatToolbar: "Markdown 快捷工具",
+        open: "打开",
+        saveMd: "保存 .md",
+        exportPdf: "导出 PDF",
+        copyMd: "复制 MD",
+        copyHtml: "复制 HTML",
+        clear: "清空",
+        split: "分屏",
+        edit: "编辑",
+        preview: "预览",
+        syncScroll: "同步滚动",
+        editLock: "编辑锁",
+        fullscreenPreview: "全屏预览",
+        fullscreenToolbar: "全屏预览工具栏",
+        exitFullscreen: "退出全屏",
+        newTab: "+ New Tab",
+        searchPlaceholder: "搜索当前 Tab",
+        prevMatch: "上一个",
+        nextMatch: "下一个",
+        decreaseFont: "缩小字号",
+        increaseFont: "放大字号",
+        theme: "切换明暗主题",
+        markdown: "Markdown",
+        previewPanel: "预览",
+        searchScope: "当前搜索只作用于当前 Tab",
+        fontSystem: "系统默认",
+        fontCn: "中文阅读",
+        fontSerif: "衬线阅读",
+        fontMono: "等宽专注",
+        h1: "一级标题",
+        h2: "二级标题",
+        h3: "三级标题",
+        bold: "加粗",
+        italic: "斜体",
+        quote: "引用",
+        ul: "无序列表",
+        ol: "有序列表",
+        task: "任务列表",
+        link: "链接",
+        image: "图片",
+        inlineCode: "行内代码",
+        codeBlock: "代码块",
+        table: "表格",
+        hr: "分割线",
+        unnamed: "未命名文档",
+        currentDoc: "当前文档",
+        docCount: (count) => `${count} 个文档`,
+        minRead: (count) => `${count} Min Read`,
+        words: (count) => `${count} Words`,
+        chars: (count) => `${count} Chars`,
+        lines: (count) => `${count} Lines`,
+        emptyPreview: "这里会显示 Markdown 预览。",
+        previewFallback: "预览库加载失败，暂时显示原文",
+        newTabToast: "已新建 Tab",
+        closeTab: "Tab 已关闭",
+        clearLastTab: "已清空最后一个 Tab",
+        clearCurrentTab: "当前 Tab 已清空",
+        fileOpened: "文件已打开",
+        fileReadFailed: "读取文件失败",
+        saved: "已保存为 .md",
+        copied: (label) => `${label}已复制`,
+        copyFailed: "复制失败，请手动选择内容",
+        fontToast: (name) => `字体：${name}`,
+        fontSizeToast: (scale) => `字号 ${scale >= 0 ? "+" : ""}${scale}`,
+        locked: "编辑锁已开启",
+        unlocked: "编辑锁已关闭",
+        lockedHint: "编辑锁开启中，先解锁再修改内容",
+        clearConfirm: "确定清空当前 Tab 的内容吗？"
+      },
+      en: {
+        stats: "Document stats",
+        mainToolbar: "Main toolbar",
+        viewMode: "View mode",
+        tabs: "Document tabs",
+        fontSelect: "Font",
+        formatToolbar: "Markdown shortcuts",
+        open: "Open",
+        saveMd: "Save .md",
+        exportPdf: "Export PDF",
+        copyMd: "Copy MD",
+        copyHtml: "Copy HTML",
+        clear: "Clear",
+        split: "Split",
+        edit: "Edit",
+        preview: "Preview",
+        syncScroll: "Sync scroll",
+        editLock: "Edit lock",
+        fullscreenPreview: "Fullscreen",
+        fullscreenToolbar: "Fullscreen preview toolbar",
+        exitFullscreen: "Exit fullscreen",
+        newTab: "+ New Tab",
+        searchPlaceholder: "Search current tab",
+        prevMatch: "Previous",
+        nextMatch: "Next",
+        decreaseFont: "Decrease font",
+        increaseFont: "Increase font",
+        theme: "Toggle theme",
+        markdown: "Markdown",
+        previewPanel: "Preview",
+        searchScope: "Search applies to the current tab only",
+        fontSystem: "System",
+        fontCn: "Chinese reading",
+        fontSerif: "Serif reading",
+        fontMono: "Mono focus",
+        h1: "Heading 1",
+        h2: "Heading 2",
+        h3: "Heading 3",
+        bold: "Bold",
+        italic: "Italic",
+        quote: "Quote",
+        ul: "Bulleted list",
+        ol: "Numbered list",
+        task: "Task list",
+        link: "Link",
+        image: "Image",
+        inlineCode: "Inline code",
+        codeBlock: "Code block",
+        table: "Table",
+        hr: "Divider",
+        unnamed: "Untitled",
+        currentDoc: "Current document",
+        docCount: (count) => `${count} document${count === 1 ? "" : "s"}`,
+        minRead: (count) => `${count} Min Read`,
+        words: (count) => `${count} Words`,
+        chars: (count) => `${count} Chars`,
+        lines: (count) => `${count} Lines`,
+        emptyPreview: "Markdown preview will appear here.",
+        previewFallback: "Preview library failed to load. Showing source text.",
+        newTabToast: "New tab created",
+        closeTab: "Tab closed",
+        clearLastTab: "Last tab cleared",
+        clearCurrentTab: "Current tab cleared",
+        fileOpened: "File opened",
+        fileReadFailed: "Could not read file",
+        saved: "Saved as .md",
+        copied: (label) => `${label} copied`,
+        copyFailed: "Copy failed. Please select manually.",
+        fontToast: (name) => `Font: ${name}`,
+        fontSizeToast: (scale) => `Font size ${scale >= 0 ? "+" : ""}${scale}`,
+        locked: "Edit lock on",
+        unlocked: "Edit lock off",
+        lockedHint: "Edit lock is on. Unlock before changing content.",
+        clearConfirm: "Clear the current tab?"
+      }
+    };
+
+    const fontPresets = {
+      system: {
+        editor: "var(--mono)",
+        content: "var(--sans)"
+      },
+      cnReadable: {
+        editor: '"Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',
+        content: '"Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif'
+      },
+      serif: {
+        editor: 'Georgia, "Times New Roman", "Songti SC", SimSun, serif',
+        content: 'Georgia, "Times New Roman", "Songti SC", SimSun, serif'
+      },
+      mono: {
+        editor: 'Consolas, "SFMono-Regular", "Liberation Mono", Menlo, monospace',
+        content: 'Consolas, "SFMono-Regular", "Liberation Mono", Menlo, monospace'
+      }
+    };
+
+    const state = {
+      tabs: [],
+      activeTabId: "",
+      view: localStorage.getItem("md-viewer-view") || "split",
+      theme: localStorage.getItem("md-viewer-theme") || "light",
+      fontScale: Number(localStorage.getItem("md-viewer-font-scale") || "0"),
+      language: localStorage.getItem("md-viewer-language") || "zh",
+      fontPreset: localStorage.getItem("md-viewer-font-preset") || "system",
+      editLocked: localStorage.getItem("md-viewer-edit-locked") === "true",
+      split: Number(localStorage.getItem("md-viewer-split") || "50"),
+      syncScroll: localStorage.getItem("md-viewer-sync-scroll") === "true",
+      isPreviewFullscreen: false,
+      previousViewBeforeFullscreen: "",
+      previewScrollBeforeFullscreen: 0,
+      search: {
+        query: "",
+        matches: [],
+        index: -1
+      },
+      isSyncing: false
+    };
+
+    const formatActions = {
+      h1: () => insertLinePrefix("# ", "一级标题"),
+      h2: () => insertLinePrefix("## ", "二级标题"),
+      h3: () => insertLinePrefix("### ", "三级标题"),
+      bold: () => wrapSelection("**", "**", "加粗文字"),
+      italic: () => wrapSelection("*", "*", "斜体文字"),
+      quote: () => insertLinePrefix("> ", "引用内容"),
+      ul: () => insertLinePrefix("- ", "列表项"),
+      ol: () => insertLinePrefix("1. ", "列表项"),
+      task: () => insertLinePrefix("- [ ] ", "待办事项"),
+      link: () => wrapSelection("[", "](https://example.com)", "链接文字"),
+      image: () => insertBlock("![图片描述](https://example.com/image.png)"),
+      inlineCode: () => wrapSelection("`", "`", "code"),
+      codeBlock: () => insertBlock("```js\nconsole.log(\"Hello Markdown\");\n```"),
+      table: () => insertBlock("| 项目 | 状态 | 备注 |\n| --- | --- | --- |\n| 示例 | 完成 | 可以继续编辑 |"),
+      hr: () => insertBlock("---")
+    };
+
+    function t(key, ...args) {
+      const value = translations[state.language]?.[key] ?? translations.zh[key] ?? key;
+      return typeof value === "function" ? value(...args) : value;
+    }
+
+    function setLanguage(language) {
+      state.language = language;
+      document.documentElement.lang = language === "en" ? "en" : "zh-CN";
+      localStorage.setItem("md-viewer-language", language);
+      languageBtn.textContent = language === "en" ? "中文" : "EN";
+      fsLanguageBtn.textContent = languageBtn.textContent;
+
+      document.querySelectorAll("[data-i18n]").forEach((element) => {
+        element.textContent = t(element.dataset.i18n);
+      });
+      document.querySelectorAll("[data-i18n-title]").forEach((element) => {
+        element.title = t(element.dataset.i18nTitle);
+      });
+      document.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
+        element.placeholder = t(element.dataset.i18nPlaceholder);
+      });
+      document.querySelectorAll("[data-i18n-aria]").forEach((element) => {
+        element.setAttribute("aria-label", t(element.dataset.i18nAria));
+      });
+
+      updateStats(editor.value);
+      renderTabs();
+      renderMarkdown();
+    }
+
+    function setFontPreset(preset, announce = true) {
+      state.fontPreset = fontPresets[preset] ? preset : "system";
+      const fonts = fontPresets[state.fontPreset];
+      document.documentElement.style.setProperty("--editor-font", fonts.editor);
+      document.documentElement.style.setProperty("--content-font", fonts.content);
+      fontSelect.value = state.fontPreset;
+      fsFontSelect.value = state.fontPreset;
+      localStorage.setItem("md-viewer-font-preset", state.fontPreset);
+      if (announce) showToast(t("fontToast", fontSelect.selectedOptions[0]?.textContent || state.fontPreset));
+    }
+
+    function setEditLocked(locked, announce = true) {
+      state.editLocked = locked;
+      editor.readOnly = locked;
+      editLockBtn.classList.toggle("active", locked);
+      document.querySelectorAll("[data-format]").forEach((button) => {
+        button.disabled = locked;
+      });
+      document.getElementById("clearBtn").disabled = locked;
+      localStorage.setItem("md-viewer-edit-locked", String(locked));
+      if (announce) showToast(locked ? t("locked") : t("unlocked"));
+    }
+
+    function ensureEditable() {
+      if (!state.editLocked) return true;
+      showToast(t("lockedHint"));
+      return false;
+    }
+
+    function createTab(content = "", title = "未命名文档", fileName = "markdown-notes.md") {
+      return {
+        id: `tab-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        title,
+        fileName,
+        content,
+        editorScroll: 0,
+        previewScroll: 0
+      };
+    }
+
+    function activeTab() {
+      return state.tabs.find((tab) => tab.id === state.activeTabId);
+    }
+
+    function saveActiveTab() {
+      const tab = activeTab();
+      if (!tab) return;
+      tab.content = editor.value;
+      tab.editorScroll = editor.scrollTop;
+      tab.previewScroll = previewWrap.scrollTop;
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function sanitizeHtml(html) {
+      const template = document.createElement("template");
+      template.innerHTML = html;
+
+      template.content.querySelectorAll("script, iframe, object, embed, form, input:not([type='checkbox'])").forEach((node) => {
+        node.remove();
+      });
+
+      template.content.querySelectorAll("*").forEach((node) => {
+        [...node.attributes].forEach((attr) => {
+          const name = attr.name.toLowerCase();
+          const value = attr.value.trim().toLowerCase();
+
+          if (name.startsWith("on") || name === "style") {
+            node.removeAttribute(attr.name);
+          }
+
+          if ((name === "href" || name === "src") && value.startsWith("javascript:")) {
+            node.removeAttribute(attr.name);
+          }
+        });
+
+        if (node.tagName === "A") {
+          node.setAttribute("target", "_blank");
+          node.setAttribute("rel", "noopener noreferrer");
+        }
+      });
+
+      return template.innerHTML;
+    }
+
+    function renderMarkdown() {
+      const markdown = editor.value;
+
+      if (!markdown.trim()) {
+        preview.innerHTML = `<p class="empty-preview">${escapeHtml(t("emptyPreview"))}</p>`;
+      } else if (window.marked) {
+        marked.setOptions({ breaks: true, gfm: true });
+        preview.innerHTML = sanitizeHtml(marked.parse(markdown));
+      } else {
+        preview.innerHTML = `<pre>${escapeHtml(markdown)}</pre>`;
+        showToast(t("previewFallback"));
+      }
+
+      updateStats(markdown);
+      updateSearch(false);
+    }
+
+    function updateStats(markdown) {
+      const tokens = markdown.trim() ? (markdown.match(/[\u4e00-\u9fa5]|[A-Za-z0-9_]+/g) || []) : [];
+      const words = tokens.length;
+      const chars = markdown.length;
+      const lines = markdown ? markdown.split(/\r\n|\r|\n/).length : 0;
+      const minutes = Math.max(1, Math.ceil(words / 260));
+
+      readTime.textContent = t("minRead", minutes);
+      wordCount.textContent = t("words", words);
+      charCount.textContent = t("chars", chars);
+      lineCount.textContent = t("lines", lines);
+    }
+
+    function renderTabs() {
+      tabsEl.innerHTML = "";
+
+      state.tabs.forEach((tab) => {
+        const tabButton = document.createElement("div");
+        tabButton.className = `tab${tab.id === state.activeTabId ? " active" : ""}`;
+        tabButton.role = "tab";
+        tabButton.tabIndex = 0;
+        tabButton.title = tab.fileName;
+        tabButton.dataset.tabId = tab.id;
+
+        const title = document.createElement("span");
+        title.className = "tab-title";
+        title.textContent = tab.title || "未命名文档";
+
+        const close = document.createElement("button");
+        close.className = "tab-close";
+        close.type = "button";
+        close.title = state.language === "en" ? "Close" : "关闭";
+        close.textContent = "×";
+        close.addEventListener("click", (event) => {
+          event.stopPropagation();
+          closeTab(tab.id);
+        });
+
+        tabButton.append(title, close);
+        tabButton.addEventListener("click", () => switchTab(tab.id));
+        tabButton.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            switchTab(tab.id);
+          }
+        });
+        tabsEl.appendChild(tabButton);
+      });
+
+      activeTabInfo.textContent = t("docCount", state.tabs.length);
+    }
+
+    function switchTab(tabId) {
+      if (tabId === state.activeTabId) return;
+      saveActiveTab();
+      state.activeTabId = tabId;
+      loadActiveTab();
+    }
+
+    function loadActiveTab() {
+      const tab = activeTab();
+      if (!tab) return;
+
+      editor.value = tab.content;
+      fileNameEl.textContent = tab.fileName || t("unnamed");
+      previewTitle.textContent = tab.title || t("currentDoc");
+      renderTabs();
+      renderMarkdown();
+
+      requestAnimationFrame(() => {
+        editor.scrollTop = tab.editorScroll || 0;
+        previewWrap.scrollTop = tab.previewScroll || 0;
+      });
+    }
+
+    function addTab(content = "", title = "未命名文档", fileName = "markdown-notes.md") {
+      saveActiveTab();
+      const tab = createTab(content, title, fileName);
+      state.tabs.push(tab);
+      state.activeTabId = tab.id;
+      searchInput.value = "";
+      loadActiveTab();
+      showToast(t("newTabToast"));
+    }
+
+    function closeTab(tabId) {
+      if (state.tabs.length === 1) {
+        const tab = activeTab();
+        tab.content = "";
+        tab.title = t("unnamed");
+        tab.fileName = "markdown-notes.md";
+        tab.editorScroll = 0;
+        tab.previewScroll = 0;
+        searchInput.value = "";
+        loadActiveTab();
+        showToast(t("clearLastTab"));
+        return;
+      }
+
+      const index = state.tabs.findIndex((tab) => tab.id === tabId);
+      if (index === -1) return;
+      state.tabs.splice(index, 1);
+
+      if (state.activeTabId === tabId) {
+        const next = state.tabs[Math.max(0, index - 1)];
+        state.activeTabId = next.id;
+      }
+
+      loadActiveTab();
+      showToast(t("closeTab"));
+    }
+
+    function setView(view) {
+      state.view = view;
+      document.body.classList.remove("view-split", "view-edit", "view-preview");
+      document.body.classList.add(`view-${view}`);
+      viewButtons.forEach((button) => {
+        button.classList.toggle("active", button.dataset.view === view);
+      });
+      localStorage.setItem("md-viewer-view", view);
+    }
+
+    async function enterPreviewFullscreen() {
+      if (state.isPreviewFullscreen) return;
+      state.previousViewBeforeFullscreen = state.view;
+      state.previewScrollBeforeFullscreen = previewWrap.scrollTop;
+      state.isPreviewFullscreen = true;
+      document.body.classList.add("preview-fullscreen");
+      setView("preview");
+
+      requestAnimationFrame(() => {
+        previewWrap.scrollTop = state.previewScrollBeforeFullscreen;
+      });
+
+      if (document.documentElement.requestFullscreen && !document.fullscreenElement) {
+        try {
+          await document.documentElement.requestFullscreen();
+        } catch (error) {
+          showToast(state.language === "en" ? "Using in-page fullscreen" : "已进入页面内全屏");
+        }
+      }
+    }
+
+    async function exitPreviewFullscreen(skipNative = false) {
+      if (!state.isPreviewFullscreen && !document.body.classList.contains("preview-fullscreen")) return;
+      const restoreView = state.previousViewBeforeFullscreen || "split";
+      const restoreScroll = state.previewScrollBeforeFullscreen || previewWrap.scrollTop;
+
+      state.isPreviewFullscreen = false;
+      document.body.classList.remove("preview-fullscreen");
+      setView(restoreView);
+
+      requestAnimationFrame(() => {
+        previewWrap.scrollTop = restoreScroll;
+      });
+
+      if (!skipNative && document.fullscreenElement && document.exitFullscreen) {
+        try {
+          await document.exitFullscreen();
+        } catch (error) {
+          // Browser may already be leaving fullscreen.
+        }
+      }
+    }
+
+    function syncFullscreenState() {
+      if (!document.fullscreenElement && state.isPreviewFullscreen) {
+        exitPreviewFullscreen(true);
+      }
+    }
+
+    function setTheme(theme) {
+      state.theme = theme;
+      document.documentElement.dataset.theme = theme;
+      themeBtn.textContent = theme === "dark" ? "☀" : "☾";
+      fsThemeBtn.textContent = themeBtn.textContent;
+      localStorage.setItem("md-viewer-theme", theme);
+    }
+
+    function setFontScale(nextScale, announce = true) {
+      state.fontScale = Math.max(-2, Math.min(4, nextScale));
+      document.documentElement.style.setProperty("--editor-size", `${15 + state.fontScale}px`);
+      document.documentElement.style.setProperty("--preview-size", `${16 + state.fontScale}px`);
+      localStorage.setItem("md-viewer-font-scale", String(state.fontScale));
+      if (announce) showToast(t("fontSizeToast", state.fontScale));
+    }
+
+    function setSplit(percent) {
+      state.split = Math.max(25, Math.min(75, percent));
+      document.documentElement.style.setProperty("--split", `${state.split}%`);
+      localStorage.setItem("md-viewer-split", String(state.split));
+    }
+
+    function setSyncScroll(enabled) {
+      state.syncScroll = enabled;
+      syncScrollBtn.classList.toggle("active", enabled);
+      localStorage.setItem("md-viewer-sync-scroll", String(enabled));
+    }
+
+    function scrollRatio(element) {
+      const max = element.scrollHeight - element.clientHeight;
+      return max > 0 ? element.scrollTop / max : 0;
+    }
+
+    function applyScrollRatio(element, ratio) {
+      const max = element.scrollHeight - element.clientHeight;
+      element.scrollTop = max > 0 ? max * ratio : 0;
+    }
+
+    function syncScrollFrom(source, target) {
+      if (!state.syncScroll || state.isSyncing || state.view !== "split" || window.innerWidth <= 920) return;
+      state.isSyncing = true;
+      applyScrollRatio(target, scrollRatio(source));
+      requestAnimationFrame(() => {
+        state.isSyncing = false;
+      });
+    }
+
+    function wrapSelection(before, after, placeholder) {
+      if (!ensureEditable()) return;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const selected = editor.value.slice(start, end) || placeholder;
+      replaceSelection(`${before}${selected}${after}`, start + before.length, start + before.length + selected.length);
+    }
+
+    function insertLinePrefix(prefix, placeholder) {
+      if (!ensureEditable()) return;
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      const selected = editor.value.slice(start, end) || placeholder;
+      const lines = selected.split(/\r\n|\r|\n/);
+      const replacement = lines.map((line) => `${prefix}${line}`).join("\n");
+      replaceSelection(replacement, start + prefix.length, start + replacement.length);
+    }
+
+    function insertBlock(block) {
+      if (!ensureEditable()) return;
+      const start = editor.selectionStart;
+      const before = editor.value.slice(0, start);
+      const after = editor.value.slice(editor.selectionEnd);
+      const prefix = before && !before.endsWith("\n") ? "\n\n" : "";
+      const suffix = after && !after.startsWith("\n") ? "\n\n" : "\n";
+      const insertion = `${prefix}${block}${suffix}`;
+      replaceSelection(insertion, start + prefix.length, start + prefix.length + block.length);
+    }
+
+    function replaceSelection(text, selectionStart, selectionEnd) {
+      const start = editor.selectionStart;
+      const end = editor.selectionEnd;
+      editor.setRangeText(text, start, end, "end");
+      editor.focus();
+      editor.setSelectionRange(selectionStart, selectionEnd);
+      handleEditorInput();
+    }
+
+    function buildSearchMatches(query) {
+      if (!query) return [];
+      const content = editor.value;
+      const lowerContent = content.toLowerCase();
+      const lowerQuery = query.toLowerCase();
+      const matches = [];
+      let index = lowerContent.indexOf(lowerQuery);
+
+      while (index !== -1) {
+        matches.push({ start: index, end: index + query.length });
+        index = lowerContent.indexOf(lowerQuery, index + Math.max(1, query.length));
+      }
+
+      return matches;
+    }
+
+    function updateSearch(keepIndex = true) {
+      state.search.query = searchInput.value;
+      const previousStart = state.search.matches[state.search.index]?.start;
+      state.search.matches = buildSearchMatches(state.search.query);
+
+      if (!state.search.matches.length) {
+        state.search.index = -1;
+        searchCount.textContent = "0/0";
+        renderPreviewWithoutSearch();
+        return;
+      }
+
+      if (!keepIndex) {
+        state.search.index = previousStart == null
+          ? 0
+          : Math.max(0, state.search.matches.findIndex((match) => match.start >= previousStart));
+      }
+
+      if (state.search.index < 0 || state.search.index >= state.search.matches.length) {
+        state.search.index = 0;
+      }
+
+      searchCount.textContent = `${state.search.index + 1}/${state.search.matches.length}`;
+      highlightPreview(state.search.query);
+    }
+
+    function goToSearchMatch(direction) {
+      updateSearch(true);
+      if (!state.search.matches.length) return;
+
+      state.search.index = (state.search.index + direction + state.search.matches.length) % state.search.matches.length;
+      const match = state.search.matches[state.search.index];
+      editor.focus();
+      editor.setSelectionRange(match.start, match.end);
+      scrollEditorSelectionIntoView();
+      searchCount.textContent = `${state.search.index + 1}/${state.search.matches.length}`;
+      highlightPreview(state.search.query);
+    }
+
+    function scrollEditorSelectionIntoView() {
+      const beforeSelection = editor.value.slice(0, editor.selectionStart);
+      const line = beforeSelection.split(/\r\n|\r|\n/).length;
+      const lineHeight = parseFloat(getComputedStyle(editor).lineHeight) || 24;
+      editor.scrollTop = Math.max(0, line * lineHeight - editor.clientHeight / 2);
+    }
+
+    function highlightPreview(query) {
+      renderPreviewWithoutSearch();
+      if (!query) return;
+
+      const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          if (!node.nodeValue.trim() || node.parentElement.closest("script, style, mark")) {
+            return NodeFilter.FILTER_REJECT;
+          }
+          return node.nodeValue.toLowerCase().includes(query.toLowerCase())
+            ? NodeFilter.FILTER_ACCEPT
+            : NodeFilter.FILTER_REJECT;
+        }
+      });
+
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+
+      nodes.forEach((node) => {
+        const fragment = document.createDocumentFragment();
+        const text = node.nodeValue;
+        const lowerText = text.toLowerCase();
+        const lowerQuery = query.toLowerCase();
+        let cursor = 0;
+        let index = lowerText.indexOf(lowerQuery);
+
+        while (index !== -1) {
+          fragment.append(document.createTextNode(text.slice(cursor, index)));
+          const mark = document.createElement("mark");
+          mark.textContent = text.slice(index, index + query.length);
+          fragment.append(mark);
+          cursor = index + query.length;
+          index = lowerText.indexOf(lowerQuery, cursor);
+        }
+
+        fragment.append(document.createTextNode(text.slice(cursor)));
+        node.replaceWith(fragment);
+      });
+    }
+
+    function renderPreviewWithoutSearch() {
+      const markdown = editor.value;
+
+      if (!markdown.trim()) {
+        preview.innerHTML = `<p class="empty-preview">${escapeHtml(t("emptyPreview"))}</p>`;
+      } else if (window.marked) {
+        marked.setOptions({ breaks: true, gfm: true });
+        preview.innerHTML = sanitizeHtml(marked.parse(markdown));
+      } else {
+        preview.innerHTML = `<pre>${escapeHtml(markdown)}</pre>`;
+      }
+    }
+
+    async function copyText(text, label) {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast(t("copied", label));
+      } catch (error) {
+        showToast(t("copyFailed"));
+      }
+    }
+
+    function downloadMarkdown() {
+      saveActiveTab();
+      const tab = activeTab();
+      const blob = new Blob([tab.content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = tab.fileName || "markdown-notes.md";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast(t("saved"));
+    }
+
+    function clearDocument() {
+      if (!ensureEditable()) return;
+      if (!editor.value.trim() || confirm(t("clearConfirm"))) {
+        const tab = activeTab();
+        tab.content = "";
+        tab.title = t("unnamed");
+        tab.fileName = "markdown-notes.md";
+        tab.editorScroll = 0;
+        tab.previewScroll = 0;
+        searchInput.value = "";
+        loadActiveTab();
+        showToast(t("clearCurrentTab"));
+      }
+    }
+
+    function loadFile(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const content = String(reader.result || "");
+        const current = activeTab();
+        const untitledNames = [translations.zh.unnamed, translations.en.unnamed];
+        const shouldUseCurrent = current && !current.content.trim() && untitledNames.includes(current.title);
+        const title = file.name.replace(/\.(md|markdown|txt)$/i, "") || file.name;
+
+        if (shouldUseCurrent) {
+          current.content = content;
+          current.title = title;
+          current.fileName = file.name || "markdown-notes.md";
+          current.editorScroll = 0;
+          current.previewScroll = 0;
+          loadActiveTab();
+        } else {
+          addTab(content, title, file.name || "markdown-notes.md");
+        }
+
+        showToast(t("fileOpened"));
+        fileInput.value = "";
+      };
+      reader.onerror = () => showToast(t("fileReadFailed"));
+      reader.readAsText(file, "utf-8");
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => {
+        toast.classList.remove("show");
+      }, 1800);
+    }
+
+    function handleEditorInput() {
+      const tab = activeTab();
+      if (!tab) return;
+      tab.content = editor.value;
+      renderMarkdown();
+    }
+
+    editor.addEventListener("input", handleEditorInput);
+    editor.addEventListener("scroll", () => {
+      const tab = activeTab();
+      if (tab) tab.editorScroll = editor.scrollTop;
+      syncScrollFrom(editor, previewWrap);
+    });
+    previewWrap.addEventListener("scroll", () => {
+      const tab = activeTab();
+      if (tab) tab.previewScroll = previewWrap.scrollTop;
+      syncScrollFrom(previewWrap, editor);
+    });
+
+    splitter.addEventListener("pointerdown", (event) => {
+      if (state.view !== "split") return;
+      splitter.setPointerCapture(event.pointerId);
+      splitter.classList.add("dragging");
+    });
+
+    splitter.addEventListener("pointermove", (event) => {
+      if (!splitter.classList.contains("dragging")) return;
+      const rect = workspace.getBoundingClientRect();
+      const percent = ((event.clientX - rect.left) / rect.width) * 100;
+      setSplit(percent);
+    });
+
+    splitter.addEventListener("pointerup", (event) => {
+      splitter.releasePointerCapture(event.pointerId);
+      splitter.classList.remove("dragging");
+    });
+
+    document.getElementById("openBtn").addEventListener("click", () => fileInput.click());
+    fileInput.addEventListener("change", (event) => loadFile(event.target.files[0]));
+    document.getElementById("downloadBtn").addEventListener("click", downloadMarkdown);
+    document.getElementById("pdfBtn").addEventListener("click", () => {
+      saveActiveTab();
+      renderPreviewWithoutSearch();
+      window.print();
+      highlightPreview(searchInput.value);
+    });
+    document.getElementById("copyMdBtn").addEventListener("click", () => copyText(editor.value, "Markdown"));
+    document.getElementById("copyHtmlBtn").addEventListener("click", () => copyText(preview.innerHTML, "HTML"));
+    document.getElementById("clearBtn").addEventListener("click", clearDocument);
+    document.getElementById("newTabBtn").addEventListener("click", () => addTab("", t("unnamed"), "markdown-notes.md"));
+    document.getElementById("decreaseFontBtn").addEventListener("click", () => setFontScale(state.fontScale - 1));
+    document.getElementById("increaseFontBtn").addEventListener("click", () => setFontScale(state.fontScale + 1));
+    themeBtn.addEventListener("click", () => setTheme(state.theme === "dark" ? "light" : "dark"));
+    fullscreenBtn.addEventListener("click", enterPreviewFullscreen);
+    syncScrollBtn.addEventListener("click", () => setSyncScroll(!state.syncScroll));
+    editLockBtn.addEventListener("click", () => setEditLocked(!state.editLocked));
+    languageBtn.addEventListener("click", () => setLanguage(state.language === "en" ? "zh" : "en"));
+    fontSelect.addEventListener("change", () => setFontPreset(fontSelect.value));
+    fsLanguageBtn.addEventListener("click", () => setLanguage(state.language === "en" ? "zh" : "en"));
+    fsFontSelect.addEventListener("change", () => setFontPreset(fsFontSelect.value));
+    fsDecreaseFontBtn.addEventListener("click", () => setFontScale(state.fontScale - 1));
+    fsIncreaseFontBtn.addEventListener("click", () => setFontScale(state.fontScale + 1));
+    fsThemeBtn.addEventListener("click", () => setTheme(state.theme === "dark" ? "light" : "dark"));
+    exitFullscreenBtn.addEventListener("click", () => exitPreviewFullscreen());
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && state.isPreviewFullscreen) {
+        exitPreviewFullscreen();
+      }
+    });
+    searchInput.addEventListener("input", () => {
+      updateSearch(false);
+    });
+    searchInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        goToSearchMatch(0);
+      }
+    });
+    document.getElementById("prevMatchBtn").addEventListener("click", () => goToSearchMatch(-1));
+    document.getElementById("nextMatchBtn").addEventListener("click", () => goToSearchMatch(1));
+    document.querySelectorAll("[data-format]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = formatActions[button.dataset.format];
+        if (action) action();
+      });
+    });
+    viewButtons.forEach((button) => {
+      button.addEventListener("click", () => setView(button.dataset.view));
+    });
+
+    state.tabs.push(createTab(sampleMarkdown, "Welcome to Markdown", "welcome.md"));
+    state.activeTabId = state.tabs[0].id;
+    setLanguage(state.language);
+    setFontPreset(state.fontPreset, false);
+    setTheme(state.theme);
+    setView(state.view);
+    setFontScale(state.fontScale, false);
+    setSplit(state.split);
+    setSyncScroll(state.syncScroll);
+    setEditLocked(state.editLocked, false);
+    loadActiveTab();
+  </script>
+</body>
+</html>
