@@ -16,6 +16,11 @@ A lightweight Windows desktop app for editing, previewing, and exporting Markdow
 推荐从 GitHub Releases 下载打包好的 Windows 版本。  
 Download the packaged Windows build from GitHub Releases.
 
+[下载 Windows 版 / Download for Windows](https://github.com/DouvidGit/Markdown-Viewer-Desktop/releases/latest/download/Markdown-Viewer-Windows.zip)
+
+下载不需要 GitHub 账号。  
+No GitHub account is required to download.
+
 如果你想从源码运行 / To run from source:
 
 ```bash
