@@ -1374,7 +1374,11 @@ function hello(name) {
       search: {
         query: "",
         matches: [],
-        index: -1
+        index: -1,
+        contentSnapshot: "",
+        querySnapshot: "",
+        previewQuery: "",
+        previewHighlighted: false
       },
       isSyncing: false
     };
@@ -1501,6 +1505,10 @@ function hello(name) {
         .replaceAll("'", "&#039;");
     }
 
+    function escapeRegExp(value) {
+      return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    }
+
     function sanitizeHtml(html) {
       const template = document.createElement("template");
       template.innerHTML = html;
@@ -1545,6 +1553,8 @@ function hello(name) {
         showToast(t("previewFallback"));
       }
 
+      state.search.previewHighlighted = false;
+      state.search.previewQuery = "";
       updateStats(markdown);
       updateSearch(false);
     }
@@ -1831,19 +1841,37 @@ function hello(name) {
     }
 
     function buildSearchMatches(query) {
-      if (!query) return [];
       const content = editor.value;
-      const lowerContent = content.toLowerCase();
-      const lowerQuery = query.toLowerCase();
-      const matches = [];
-      let index = lowerContent.indexOf(lowerQuery);
 
-      while (index !== -1) {
-        matches.push({ start: index, end: index + query.length });
-        index = lowerContent.indexOf(lowerQuery, index + Math.max(1, query.length));
+      if (!query) {
+        state.search.contentSnapshot = content;
+        state.search.querySnapshot = query;
+        state.search.matches = [];
+        return state.search.matches;
       }
 
-      return matches;
+      if (state.search.contentSnapshot === content && state.search.querySnapshot === query) {
+        return state.search.matches;
+      }
+
+      const matches = [];
+      const searchPattern = new RegExp(escapeRegExp(query), "gi");
+      let match = searchPattern.exec(content);
+
+      while (match) {
+        matches.push({ start: match.index, end: match.index + match[0].length });
+        match = searchPattern.exec(content);
+      }
+
+      state.search.contentSnapshot = content;
+      state.search.querySnapshot = query;
+      state.search.matches = matches;
+      return state.search.matches;
+    }
+
+    function clearPreviewSearchHighlights() {
+      if (!state.search.previewHighlighted) return;
+      renderPreviewWithoutSearch();
     }
 
     function updateSearch(keepIndex = true) {
@@ -1854,7 +1882,7 @@ function hello(name) {
       if (!state.search.matches.length) {
         state.search.index = -1;
         searchCount.textContent = "0/0";
-        renderPreviewWithoutSearch();
+        clearPreviewSearchHighlights();
         return;
       }
 
@@ -1893,15 +1921,26 @@ function hello(name) {
     }
 
     function highlightPreview(query) {
+      if (!query) {
+        clearPreviewSearchHighlights();
+        return;
+      }
+
+      if (state.search.previewHighlighted && state.search.previewQuery === query) {
+        return;
+      }
+
       renderPreviewWithoutSearch();
-      if (!query) return;
+      const escapedQuery = escapeRegExp(query);
+      const testPattern = new RegExp(escapedQuery, "i");
+      const replacePattern = new RegExp(escapedQuery, "gi");
 
       const walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
           if (!node.nodeValue.trim() || node.parentElement.closest("script, style, mark")) {
             return NodeFilter.FILTER_REJECT;
           }
-          return node.nodeValue.toLowerCase().includes(query.toLowerCase())
+          return testPattern.test(node.nodeValue)
             ? NodeFilter.FILTER_ACCEPT
             : NodeFilter.FILTER_REJECT;
         }
@@ -1913,23 +1952,26 @@ function hello(name) {
       nodes.forEach((node) => {
         const fragment = document.createDocumentFragment();
         const text = node.nodeValue;
-        const lowerText = text.toLowerCase();
-        const lowerQuery = query.toLowerCase();
         let cursor = 0;
-        let index = lowerText.indexOf(lowerQuery);
+        replacePattern.lastIndex = 0;
+        let match = replacePattern.exec(text);
 
-        while (index !== -1) {
+        while (match) {
+          const index = match.index;
           fragment.append(document.createTextNode(text.slice(cursor, index)));
           const mark = document.createElement("mark");
-          mark.textContent = text.slice(index, index + query.length);
+          mark.textContent = match[0];
           fragment.append(mark);
-          cursor = index + query.length;
-          index = lowerText.indexOf(lowerQuery, cursor);
+          cursor = index + match[0].length;
+          match = replacePattern.exec(text);
         }
 
         fragment.append(document.createTextNode(text.slice(cursor)));
         node.replaceWith(fragment);
       });
+
+      state.search.previewHighlighted = true;
+      state.search.previewQuery = query;
     }
 
     function renderPreviewWithoutSearch() {
@@ -1943,6 +1985,9 @@ function hello(name) {
       } else {
         preview.innerHTML = `<pre>${escapeHtml(markdown)}</pre>`;
       }
+
+      state.search.previewHighlighted = false;
+      state.search.previewQuery = "";
     }
 
     async function copyText(text, label) {
